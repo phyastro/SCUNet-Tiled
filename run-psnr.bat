@@ -1,0 +1,1 @@
+python main_test_scunet_real_application.py --model_name scunet_color_real_psnr --testset_name Images --rows 5 --columns 5

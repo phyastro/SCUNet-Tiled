@@ -4,6 +4,7 @@ import random
 import numpy as np
 import torch
 import cv2
+from PIL import Image
 from torchvision.utils import make_grid
 from datetime import datetime
 # import torchvision.transforms as transforms
@@ -23,7 +24,7 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 '''
 
 
-IMG_EXTENSIONS = ['.jpg', '.JPG', '.jpeg', '.JPEG', '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP', '.tif']
+IMG_EXTENSIONS = ['.jpg', '.JPG', '.jpeg', '.JPEG', '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP', '.tif', '.tiff']
 
 
 def is_image_file(filename):
@@ -193,11 +194,13 @@ def imread_uint(path, n_channels=3):
         img = cv2.imread(path, 0)  # cv2.IMREAD_GRAYSCALE
         img = np.expand_dims(img, axis=2)  # HxWx1
     elif n_channels == 3:
-        img = cv2.imread(path, cv2.IMREAD_UNCHANGED)  # BGR or G
+        img = cv2.imread(path)  # BGR or G
         if img.ndim == 2:
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)  # GGG
         else:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # RGB
+    #img_PIL = Image.open(path)
+    #img = np.array(img_PIL)
     return img
 
 
@@ -206,15 +209,19 @@ def imread_uint(path, n_channels=3):
 # --------------------------------------------
 def imsave(img, img_path):
     img = np.squeeze(img)
-    if img.ndim == 3:
-        img = img[:, :, [2, 1, 0]]
-    cv2.imwrite(img_path, img)
+    #if img.ndim == 3:
+    #    img = img[:, :, [2, 1, 0]]
+    #cv2.imwrite(img_path, img, [int(cv2.IMWRITE_PNG_COMPRESSION), 0])
+    img_PIL = Image.fromarray(img)
+    img_PIL.save(img_path, compress_level=0, quality=100)
 
 def imwrite(img, img_path):
     img = np.squeeze(img)
-    if img.ndim == 3:
-        img = img[:, :, [2, 1, 0]]
-    cv2.imwrite(img_path, img)
+    #if img.ndim == 3:
+    #    img = img[:, :, [2, 1, 0]]
+    #cv2.imwrite(img_path, img, [int(cv2.IMWRITE_PNG_COMPRESSION), 0])
+    img_PIL = Image.fromarray(img)
+    img_PIL.save(img_path, compress_level=0, quality=100)
 
 
 
@@ -296,6 +303,13 @@ def tensor2uint(img):
         img = np.transpose(img, (1, 2, 0))
     return np.uint8((img*255.0).round())
 
+
+# convert 2/3/4-dimensional torch tensor to numpy uint
+def tensor2numpyuint(img):
+    img = img.data.squeeze().float().clamp_(0, 1).cpu().numpy()
+    if img.ndim == 3:
+        img = np.transpose(img, (1, 2, 0))
+    return np.array((img*255.0).round(), dtype=np.uint8)
 
 # --------------------------------------------
 # numpy(single) (HxWxC) <--->  tensor

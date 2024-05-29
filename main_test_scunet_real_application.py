@@ -1,6 +1,9 @@
 import os.path
 import logging
 import argparse
+import time
+import math
+import imagetiles
 
 import numpy as np
 from datetime import datetime
@@ -32,6 +35,8 @@ def main():
     parser.add_argument('--model_zoo', type=str, default='model_zoo', help='path of model_zoo')
     parser.add_argument('--testsets', type=str, default='testsets', help='path of testing folder')
     parser.add_argument('--results', type=str, default='results', help='path of results')
+    parser.add_argument('--rows', type=int, default=5, help='number of tiles in a column')
+    parser.add_argument('--columns', type=int, default=5, help='number of tiles in a row')
 
     args = parser.parse_args()
 
@@ -88,22 +93,34 @@ def main():
 
         util.imshow(img_L) if args.show_img else None
 
-        img_L = util.uint2tensor4(img_L)
-        img_L = img_L.to(device)
+        grid = (args.rows, args.columns)
+        overlap = math.ceil(0.125 * ((img_L.shape[0] // grid[0]) + (img_L.shape[1] // grid[1]))) # overlap pixels
+        splitter = imagetiles.SplitImage(img_L, grid, overlap) # Create SplitImage object
+        tiles, tile_pad_height, tile_pad_width = splitter.split_image() # Split image into tiles
+        print(f"height of the tile: {len(tiles[0])}")
+        print(f"width of the tile: {len(tiles[0][0])}")
+        print(f"total number of tiles: {len(tiles)}")
 
-        # ------------------------------------
-        # (2) img_E
-        # ------------------------------------
+        start = time.perf_counter()
+        for k in range(len(tiles)):
+            input = util.uint2tensor4(tiles[k])
+            input = input.to(device)
 
-        #img_E = utils_model.test_mode(model, img_L, refield=64, min_size=512, mode=2)
+            output = model(input)
 
-        img_E = model(img_L)
-        img_E = util.tensor2uint(img_E)
+            tiles[k] = util.tensor2numpyuint(output)
+            print(f"tile {k + 1} has been finished")
+        end = time.perf_counter()
+
+        combiner = imagetiles.CombineTiles(tiles, grid, overlap, tile_pad_height, tile_pad_width) # Create CombineTiles object
+        final = combiner.combine_tiles() # Combine tiles into original image
+        final = final[0:img_L.shape[0], 0:img_L.shape[1]]
 
         # ------------------------------------
         # save results
         # ------------------------------------
-        util.imsave(img_E, os.path.join(E_path, img_name+'.png'))
+        util.imsave(final, os.path.join(E_path, img_name+ext))
+        print(f"Denoised The Image In {end - start}s")
 
 if __name__ == '__main__':
 
